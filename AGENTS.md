@@ -30,4 +30,4 @@ Current history uses short, imperative, lower-case commit messages, such as `add
 
 ## Security & Configuration Tips
 
-Do not commit real credentials. Copy `.env.example` to `.env` for local work and set either `GOOGLE_API_KEY` or the Vertex AI variables described in `README.md`. Treat `data/` as fictional fixtures; keep any new customer examples synthetic and run redaction tests when modifying privacy-related logic.
+Do not commit real credentials. Copy `.env.example` to `.env` for local work and set either `GOOGLE_API_KEY` or the Agent Platform variables described in `README.md`. Treat `data/` as fictional fixtures; keep any new customer examples synthetic and run redaction tests when modifying privacy-related logic.

@@ -40,7 +40,7 @@ make setup
 cp .env.example .env
 ```
 
-Set either `GOOGLE_API_KEY` for Google AI Studio or Vertex AI environment variables in `.env`.
+Set either `GOOGLE_API_KEY` for Google AI Studio or Agent Platform environment variables in `.env`.
 
 Important dependency note: ADK 2.1 requires `a2a-sdk>=0.3,<0.4` for the current A2A helper modules. This repo pins `a2a-sdk[http-server]==0.3.26` so the Starlette A2A server can serve agent cards and JSON-RPC routes.
 
@@ -93,7 +93,7 @@ make lint
 make test
 ```
 
-## Deploy to Agent Runtime
+## Deploy to Agent Platform Agent Runtime
 
 Authenticate with Google Cloud first:
 
@@ -102,6 +102,8 @@ gcloud auth application-default login
 gcloud config set project YOUR_PROJECT_ID
 ```
 
+Enable the Agent Platform API and Cloud Resource Manager API in the target Google Cloud project.
+
 Then set the required environment variables:
 
 ```bash
@@ -109,6 +111,8 @@ export GOOGLE_CLOUD_PROJECT=YOUR_PROJECT_ID
 export GOOGLE_CLOUD_LOCATION=us-central1
 export GOOGLE_GENAI_USE_VERTEXAI=true
 ```
+
+`GOOGLE_GENAI_USE_VERTEXAI` is the current google-genai switch for using the Agent Platform backend.
 
 Deploy every agent:
 
@@ -120,17 +124,17 @@ The script deploys each specialist and the coordinator with:
 
 ```bash
 uv export --format requirements.txt --no-dev --no-hashes --no-emit-project \
-  --output-file .agent-engine-temp/requirements.txt
+  --output-file .agent-runtime-temp/requirements.txt
 
-uv run adk deploy agent_engine . \
+uv run adk deploy agent_engine "$DEPLOY_SOURCE_DIR" \
   --project "$GOOGLE_CLOUD_PROJECT" \
   --region "$GOOGLE_CLOUD_LOCATION" \
-  --adk_app agents/<agent_name>/agent.py \
   --adk_app_object root_agent \
-  --requirements_file .agent-engine-temp/requirements.txt
+  --requirements_file "$PWD/.agent-runtime-temp/requirements.txt" \
+  --temp_folder acmedesk_agent_runtime_<agent_name>
 ```
 
-The temporary requirements file is exported from the uv lockfile because the ADK Agent Runtime deploy command accepts a requirements file.
+For each deployed agent, `scripts/deploy_all.sh` creates a clean temporary source directory outside the repository with a root `agent.py` that re-exports that agent's `root_agent`. The temporary requirements file is exported from the uv lockfile because the ADK Agent Runtime deploy command accepts a requirements file. The ADK CLI still exposes this deployment target through the `agent_engine` subcommand, but the managed destination is Agent Platform Agent Runtime.
 
 After the specialist Agent Runtime resources are created, expose or connect them as A2A endpoints following the Agent2Agent Runtime documentation, then update the coordinator environment variables to point to those endpoint agent-card URLs.
 

@@ -46,4 +46,4 @@ web:
 	PYTHONPATH=src $(UV_RUN) adk web agents --port 8000
 
 clean:
-	rm -rf .venv .pytest_cache .ruff_cache .agent-engine-temp build dist *.egg-info
+	rm -rf .venv .pytest_cache .ruff_cache .agent-runtime-temp .agent-engine-temp build dist *.egg-info
