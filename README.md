@@ -17,15 +17,17 @@ Support Coordinator Agent
 ```
 
 Each specialist is an ADK agent exposed as an A2A Starlette app with `to_a2a()`.
-The coordinator is a `SequentialAgent` that consumes the specialists through
-`RemoteA2aAgent(use_legacy=False)` entries in `sub_agents`. Its first step is a
-`ParallelAgent` that runs the ticket history, knowledge base, account context,
-incident status, and escalation policy specialists concurrently instead of
-exposing `transfer_to_agent(...)` choices from a coordinator LLM agent. After the
-parallel research and policy step completes, a local coordinator synthesis agent
-creates the support brief, the customer communication A2A agent drafts the
-customer-facing response package, and a final coordinator synthesis agent
-produces the final brief.
+The coordinator is a graph-based `Workflow` that consumes the specialists through
+direct `RemoteA2aAgent(use_legacy=False)` graph nodes. The first five graph
+branches start from `START`, so ticket history, knowledge base, account context,
+incident status, and escalation policy run concurrently. A `JoinNode` waits for
+those research and policy branches to complete, then a local function node
+assembles their event text for the coordinator synthesis agent. The customer
+communication A2A agent drafts the customer-facing response package, another
+function node assembles the final response input, and a final coordinator
+synthesis agent produces the final brief. This keeps orchestration deterministic
+and avoids exposing `transfer_to_agent(...)` choices from a coordinator LLM
+agent.
 
 For deterministic workshop checks, the shared `acmedesk_support` package also exposes local search and brief-building functions. The CLI sample cases use those functions so they can run without calling an LLM. That deterministic path is not registered as a coordinator ADK tool.
 
