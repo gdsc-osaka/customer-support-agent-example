@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from google.adk.agents import Agent
+from google.adk import Agent
 
 from acmedesk_support.incidents import correlate_incidents
 from agents._common import build_a2a_app, model_name

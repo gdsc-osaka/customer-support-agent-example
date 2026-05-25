@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from google.adk import Workflow
-from google.adk.agents import Agent
+from google.adk import Agent, Workflow
 from google.adk.agents.context import Context
 from google.adk.agents.remote_a2a_agent import RemoteA2aAgent
 from google.adk.events.event import Event

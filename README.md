@@ -113,6 +113,7 @@ export GOOGLE_GENAI_USE_VERTEXAI=true
 ```
 
 `GOOGLE_GENAI_USE_VERTEXAI` is the current google-genai switch for using the Agent Platform backend.
+Set `TRACE_TO_CLOUD=true` or `ACMEDESK_TRACE_TO_CLOUD=true` before deployment to enable Cloud Trace.
 
 Deploy every agent:
 
@@ -120,23 +121,18 @@ Deploy every agent:
 make deploy-all
 ```
 
-The script deploys each specialist and the coordinator with:
+The script exports dependencies from the uv lockfile:
 
 ```bash
 uv export --format requirements.txt --no-dev --no-hashes --no-emit-project \
   --output-file .agent-runtime-temp/requirements.txt
-
-uv run adk deploy agent_engine "$DEPLOY_SOURCE_DIR" \
-  --project "$GOOGLE_CLOUD_PROJECT" \
-  --region "$GOOGLE_CLOUD_LOCATION" \
-  --adk_app_object root_agent \
-  --requirements_file "$PWD/.agent-runtime-temp/requirements.txt" \
-  --temp_folder acmedesk_agent_runtime_<agent_name>
 ```
 
-For each deployed agent, `scripts/deploy_all.sh` creates a clean temporary source directory outside the repository with a root `agent.py` that re-exports that agent's `root_agent`. The temporary requirements file is exported from the uv lockfile because the ADK Agent Runtime deploy command accepts a requirements file. The ADK CLI still exposes this deployment target through the `agent_engine` subcommand, but the managed destination is Agent Platform Agent Runtime.
+Agents are deployed from source files with the Agent Runtime API. This source-file deployment path does not require a Cloud Storage staging bucket.
 
-After the specialist Agent Runtime resources are created, expose or connect them as A2A endpoints following the Agent2Agent Runtime documentation, then update the coordinator environment variables to point to those endpoint agent-card URLs.
+For each deployed agent, `scripts/deploy_all.sh` creates a clean temporary source directory outside the repository with a root `agent.py` that re-exports that agent's `root_agent`. Specialist temporary entrypoints wrap the ADK agent in an A2A Runtime `A2aAgent`; the coordinator temporary entrypoint wraps the ADK workflow in an Agent Runtime `AdkApp`.
+
+After the specialist Agent Runtime resources are created, the script writes their authenticated A2A card URLs into the coordinator deployment environment variables.
 
 Agent2Agent on Agent Runtime is currently a preview workflow. Keep local A2A URLs for workshop development and use runtime endpoints for the deployment exercise.
 

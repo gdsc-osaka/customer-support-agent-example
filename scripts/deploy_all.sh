@@ -6,11 +6,23 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 cd "${REPO_ROOT}"
 
+load_env_defaults() {
+  local env_file="$1"
+  local line key
+  while IFS= read -r line || [[ -n "${line}" ]]; do
+    line="${line#"${line%%[![:space:]]*}"}"
+    line="${line%"${line##*[![:space:]]}"}"
+    [[ -z "${line}" || "${line}" == \#* || "${line}" != *=* ]] && continue
+    key="${line%%=*}"
+    key="${key%"${key##*[![:space:]]}"}"
+    if [[ -z "${!key+x}" ]]; then
+      export "${line}"
+    fi
+  done < "${env_file}"
+}
+
 if [[ -f "${REPO_ROOT}/.env" ]]; then
-  set -a
-  # shellcheck source=/dev/null
-  . "${REPO_ROOT}/.env"
-  set +a
+  load_env_defaults "${REPO_ROOT}/.env"
 fi
 
 if [[ -z "${GOOGLE_CLOUD_PROJECT:-}" ]]; then
@@ -23,6 +35,7 @@ UV_BIN="${UV_BIN:-uv}"
 LOG_DIR="${REPO_ROOT}/.agent-runtime-temp"
 DEPLOY_WORK_DIR="${LOG_DIR}/deploy-work"
 REQ_FILE="${LOG_DIR}/requirements.txt"
+TRACE_TO_CLOUD="${TRACE_TO_CLOUD:-${ACMEDESK_TRACE_TO_CLOUD:-false}}"
 A2A_ENV_NAMES=(
   TICKET_HISTORY_A2A_URL
   KNOWLEDGE_BASE_A2A_URL
@@ -71,6 +84,13 @@ ok()    { printf "%s[ ok ]%s %s\n"  "${FG_GREEN}${BOLD}"  "${RESET}" "$*"; }
 warn()  { printf "%s[warn]%s %s\n"  "${FG_YELLOW}${BOLD}" "${RESET}" "$*"; }
 err()   { printf "%s[fail]%s %s\n"  "${FG_RED}${BOLD}"    "${RESET}" "$*" >&2; }
 
+is_truthy() {
+  case "${1:-}" in
+    1|true|TRUE|yes|YES|on|ON) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 validate_coordinator_a2a_env() {
   local missing=()
   local env_name
@@ -110,7 +130,7 @@ append_specialist_a2a_card_urls() {
     agent_slug="$(slugify "${name}")"
     engine_id_file="${LOG_DIR}/${agent_slug}.engine_id"
     if [[ ! -s "${engine_id_file}" ]]; then
-      err "Missing Agent Engine ID for ${name}; expected ${engine_id_file}"
+      err "Missing Agent Runtime resource ID for ${name}; expected ${engine_id_file}"
       return 1
     fi
     engine_id="$(cat "${engine_id_file}")"
@@ -129,11 +149,11 @@ banner "AcmeDesk Agent Runtime — Parallel Deploy"
 info "Project: ${BOLD}${GOOGLE_CLOUD_PROJECT}${RESET}   Region: ${BOLD}${REGION}${RESET}"
 info "Logs:    ${LOG_DIR}"
 
-info "Fetching existing Agent Engine instances (to update in place rather than duplicate)..."
+info "Fetching existing Agent Runtime resources (to update in place rather than duplicate)..."
 GCP_TOKEN="$(gcloud auth print-access-token 2>/dev/null || true)"
 if [[ -z "${GCP_TOKEN}" ]]; then
   err "Could not obtain an access token via 'gcloud auth print-access-token'."
-  err "Run 'gcloud auth login' (or set up ADC) so the script can look up existing Agent Engine IDs;"
+  err "Run 'gcloud auth login' (or set up ADC) so the script can look up existing Agent Runtime resource IDs;"
   err "otherwise each run would create duplicate agents instead of updating them."
   exit 2
 fi
@@ -171,7 +191,7 @@ for name, rid in results.items():
 PY
 
 existing_count=$(wc -l < "${EXISTING_ENGINES_FILE}" | tr -d ' ')
-info "Found ${BOLD}${existing_count}${RESET} existing Agent Engine instance(s) in this project/region."
+info "Found ${BOLD}${existing_count}${RESET} existing Agent Runtime resource(s) in this project/region."
 
 lookup_engine_id() {
   awk -F'\t' -v n="$1" '$1 == n { print $2; exit }' "${EXISTING_ENGINES_FILE}"
@@ -191,13 +211,16 @@ info "Exporting requirements..."
 # in spec.deployment_spec.env is rejected.
 DEPLOY_ENV_FILE="${LOG_DIR}/deploy.env"
 if [[ -f "${REPO_ROOT}/.env" ]]; then
-  grep -v -E '^[[:space:]]*(GOOGLE_API_KEY|GOOGLE_GENAI_USE_VERTEXAI|GOOGLE_CLOUD_PROJECT|GOOGLE_CLOUD_LOCATION|GOOGLE_CLOUD_REGION|[A-Z_]+_A2A_URL)[[:space:]]*=' \
+  grep -v -E '^[[:space:]]*(GOOGLE_API_KEY|GOOGLE_GENAI_USE_VERTEXAI|GOOGLE_CLOUD_PROJECT|GOOGLE_CLOUD_LOCATION|GOOGLE_CLOUD_REGION|TRACE_TO_CLOUD|ACMEDESK_TRACE_TO_CLOUD|[A-Z_]+_A2A_URL)[[:space:]]*=' \
     "${REPO_ROOT}/.env" > "${DEPLOY_ENV_FILE}" || true
 else
   : > "${DEPLOY_ENV_FILE}"
 fi
 echo "GOOGLE_GENAI_USE_VERTEXAI=true" >> "${DEPLOY_ENV_FILE}"
 echo "ACMEDESK_A2A_USE_ADC_AUTH=true" >> "${DEPLOY_ENV_FILE}"
+if is_truthy "${TRACE_TO_CLOUD}"; then
+  echo "ACMEDESK_TRACE_TO_CLOUD=true" >> "${DEPLOY_ENV_FILE}"
+fi
 
 slugify() {
   printf "%s" "$1" \
@@ -211,7 +234,11 @@ prepare_deploy_source() {
   local deploy_kind="$3"
   local description="$4"
   local description_literal
+  local trace_literal="False"
   description_literal="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "${description}")"
+  if is_truthy "${TRACE_TO_CLOUD}"; then
+    trace_literal="True"
+  fi
 
   rm -rf "${source_dir}"
   mkdir -p "${source_dir}"
@@ -226,8 +253,9 @@ prepare_deploy_source() {
     --exclude ".agent-engine-temp/" \
     "${REPO_ROOT}/" "${source_dir}/"
 
+  cp "${REQ_FILE}" "${source_dir}/requirements.txt"
+
   if [[ "${deploy_kind}" == "a2a" ]]; then
-    cp "${REQ_FILE}" "${source_dir}/requirements.txt"
     cat > "${source_dir}/agent.py" <<PY
 import os, sys
 
@@ -252,14 +280,33 @@ for _p in (_HERE, os.path.join(_HERE, "src")):
 
 from ${agent_module} import root_agent
 PY
+    cat > "${source_dir}/agent_runtime_app.py" <<PY
+import os
+import vertexai
+from google.adk.apps import App
+from vertexai.agent_engines import AdkApp
+
+from agent import root_agent
+
+vertexai.init(
+    project=os.environ.get("GOOGLE_CLOUD_PROJECT"),
+    location=os.environ.get("GOOGLE_CLOUD_LOCATION"),
+)
+
+adk_app = AdkApp(
+    app=App(name=root_agent.name or "acmedesk_agent", root_agent=root_agent),
+    enable_tracing=${trace_literal},
+)
+PY
   fi
 }
 
-deploy_a2a_agent_with_sdk() {
+deploy_runtime_source_agent() {
   local source_dir="$1"
   local display_name="$2"
   local description="$3"
   local existing_id="$4"
+  local deploy_kind="$5"
 
   set +e
   GOOGLE_CLOUD_PROJECT="${GOOGLE_CLOUD_PROJECT}" \
@@ -269,17 +316,16 @@ deploy_a2a_agent_with_sdk() {
   DESCRIPTION="${description}" \
   EXISTING_ID="${existing_id}" \
   DEPLOY_ENV_FILE="${DEPLOY_ENV_FILE}" \
+  DEPLOY_KIND="${deploy_kind}" \
   "${UV_BIN}" run python - <<'PY'
 from __future__ import annotations
 
 import importlib
-import json
 import os
 import sys
 
 import vertexai
 from google.genai import types as genai_types
-from vertexai._genai import _agent_engines_utils
 
 
 def load_env(path: str) -> dict[str, str]:
@@ -301,23 +347,10 @@ display_name = os.environ["DISPLAY_NAME"]
 description = os.environ["DESCRIPTION"]
 existing_id = os.environ.get("EXISTING_ID", "")
 env_vars = load_env(os.environ["DEPLOY_ENV_FILE"])
+deploy_kind = os.environ["DEPLOY_KIND"]
 
 os.chdir(source_dir)
 sys.path.insert(0, source_dir)
-root_agent = importlib.import_module("agent").root_agent
-
-class_methods = []
-for mode, method_names in root_agent.register_operations().items():
-    for method_name in method_names:
-        method = getattr(root_agent, method_name)
-        schema = _agent_engines_utils._generate_schema(method, schema_name=method_name)
-        schema["api_mode"] = mode
-        if hasattr(root_agent, "agent_card"):
-            schema["a2a_agent_card"] = root_agent.agent_card.model_dump_json(
-                exclude_none=True,
-                by_alias=True,
-            )
-        class_methods.append(schema)
 
 vertexai.init(project=project, location=location)
 client = vertexai.Client(
@@ -325,37 +358,84 @@ client = vertexai.Client(
     location=location,
     http_options=genai_types.HttpOptions(api_version="v1beta1"),
 )
-config = {
-    "display_name": display_name,
-    "description": description,
-    "source_packages": [
+
+if deploy_kind == "a2a":
+    root_agent = importlib.import_module("agent").root_agent
+    entrypoint_module = "agent"
+    entrypoint_object = "root_agent"
+    source_packages = [
         "agent.py",
         "agents",
         "data",
         "pyproject.toml",
         "requirements.txt",
         "src",
-    ],
-    "entrypoint_module": "agent",
-    "entrypoint_object": "root_agent",
+    ]
+    class_methods = []
+    for mode, method_names in root_agent.register_operations().items():
+        for method_name in method_names:
+            class_methods.append(
+                {
+                    "name": method_name,
+                    "description": None,
+                    "parameters": {
+                        "properties": {},
+                        "type": "object",
+                        "required": ["request", "context"],
+                    },
+                    "api_mode": mode,
+                    "a2a_agent_card": root_agent.agent_card.model_dump_json(
+                        exclude_none=True,
+                        by_alias=True,
+                    ),
+                }
+            )
+    agent_framework = None
+else:
+    from google.adk.cli.cli_deploy import _AGENT_ENGINE_CLASS_METHODS
+
+    importlib.import_module("agent_runtime_app").adk_app
+    entrypoint_module = "agent_runtime_app"
+    entrypoint_object = "adk_app"
+    source_packages = [
+        "agent.py",
+        "agent_runtime_app.py",
+        "agents",
+        "data",
+        "pyproject.toml",
+        "requirements.txt",
+        "src",
+    ]
+    class_methods = _AGENT_ENGINE_CLASS_METHODS
+    agent_framework = "google-adk"
+
+config = {
+    "display_name": display_name,
+    "description": description,
+    "source_packages": source_packages,
+    "entrypoint_module": entrypoint_module,
+    "entrypoint_object": entrypoint_object,
     "requirements_file": "requirements.txt",
     "env_vars": env_vars,
     "class_methods": class_methods,
 }
+if agent_framework:
+    config["agent_framework"] = agent_framework
+
+for path in config["source_packages"]:
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Configured source package does not exist: {path}")
 
 if existing_id:
     resource_name = (
         f"projects/{project}/locations/{location}/reasoningEngines/{existing_id}"
     )
-    agent_engine = client.agent_engines.update(
-        name=resource_name,
-        config=config,
-    )
+    agent_engine = client.agent_engines.update(name=resource_name, config=config)
 else:
     agent_engine = client.agent_engines.create(config=config)
 
 name = agent_engine.api_resource.name
-print(f"✅ Deployed agent engine: {name}")
+print(f"Deployed Agent Runtime resource: {name}")
 PY
   local rc=$?
   set -e
@@ -372,25 +452,16 @@ deploy_agent() {
   local agent_slug
   agent_slug="$(slugify "${name}")"
   local source_dir="${DEPLOY_WORK_DIR}/source_${agent_slug}"
-  local staging_dir="acmedesk_agent_runtime_${agent_slug}"
   local log_file="${LOG_DIR}/${agent_slug}.deploy.log"
   local status_file="${LOG_DIR}/${agent_slug}.status"
   local engine_id_file="${LOG_DIR}/${agent_slug}.engine_id"
   local prefix="${color}${BOLD}[${name}]${RESET}"
 
-  local env_args=()
-  if [[ -f "${DEPLOY_ENV_FILE}" ]]; then
-    env_args=(--env_file "${DEPLOY_ENV_FILE}")
-  fi
-
   local display_name="AcmeDesk ${name}"
   local existing_id
   existing_id="$(lookup_engine_id "${display_name}")"
-
-  local id_args=()
   local action_label
   if [[ -n "${existing_id}" ]]; then
-    id_args=(--agent_engine_id "${existing_id}")
     action_label="updating ${FG_YELLOW}${existing_id}${RESET}"
   else
     action_label="${FG_GREEN}creating new${RESET}"
@@ -402,34 +473,18 @@ deploy_agent() {
     "${prefix}" "${DIM}${FG_GREY}" "${action_label}${DIM}${FG_GREY}" "${RESET}"
 
   local rc
-  if [[ "${deploy_kind}" == "a2a" ]]; then
-    set +e
-    deploy_a2a_agent_with_sdk "${source_dir}" "${display_name}" "${description}" "${existing_id}" \
-      2>&1 \
-      | tee "${log_file}" \
-      | awk -v p="${prefix} " '{ printf "%s%s\n", p, $0; fflush(); }'
-    rc=${PIPESTATUS[0]}
-    set -e
-  else
-    # Run adk and stream its output with a colored prefix while also tee'ing the
-    # raw text to a per-agent log file. PIPESTATUS[0] captures adk's exit code.
-    set +e
-    "${UV_BIN}" run adk deploy agent_engine "${source_dir}" \
-      --project "${GOOGLE_CLOUD_PROJECT}" \
-      --region "${REGION}" \
-      --display_name "${display_name}" \
-      --description "${description}" \
-      --adk_app_object root_agent \
-      "${id_args[@]}" \
-      "${env_args[@]}" \
-      --requirements_file "${REQ_FILE}" \
-      --temp_folder "${staging_dir}" \
-      2>&1 \
-      | tee "${log_file}" \
-      | awk -v p="${prefix} " '{ printf "%s%s\n", p, $0; fflush(); }'
-    rc=${PIPESTATUS[0]}
-    set -e
-  fi
+  set +e
+  deploy_runtime_source_agent \
+    "${source_dir}" \
+    "${display_name}" \
+    "${description}" \
+    "${existing_id}" \
+    "${deploy_kind}" \
+    2>&1 \
+    | tee "${log_file}" \
+    | awk -v p="${prefix} " '{ printf "%s%s\n", p, $0; fflush(); }'
+  rc=${PIPESTATUS[0]}
+  set -e
 
   rm -rf "${source_dir}"
 

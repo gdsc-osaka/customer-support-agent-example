@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from google.adk.agents import Agent
+from google.adk import Agent
 
 from acmedesk_support.communication import generate_customer_response_package
 from agents._common import build_a2a_app, model_name

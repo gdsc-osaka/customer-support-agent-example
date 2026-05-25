@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import sys
 import time
+import warnings
 from pathlib import Path
 
 import httpx
@@ -10,6 +11,7 @@ from dotenv import load_dotenv
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = REPO_ROOT / "src"
+_CLOUD_TRACE_ENABLED = False
 
 
 def ensure_src_path() -> None:
@@ -20,6 +22,39 @@ def ensure_src_path() -> None:
 
 ensure_src_path()
 load_dotenv(REPO_ROOT / ".env")
+
+
+def env_bool(name: str) -> bool:
+    return os.getenv(name, "").lower() in {"1", "true", "yes", "on"}
+
+
+def maybe_enable_cloud_trace() -> None:
+    global _CLOUD_TRACE_ENABLED
+    if _CLOUD_TRACE_ENABLED or not env_bool("ACMEDESK_TRACE_TO_CLOUD"):
+        return
+
+    try:
+        import google.auth
+        from google.adk.telemetry.google_cloud import get_gcp_exporters, get_gcp_resource
+        from google.adk.telemetry.setup import maybe_set_otel_providers
+
+        credentials, project_id = google.auth.default()
+        hooks = get_gcp_exporters(
+            enable_cloud_tracing=True,
+            google_auth=(credentials, project_id),
+        )
+        maybe_set_otel_providers(
+            otel_hooks_to_setup=[hooks],
+            otel_resource=get_gcp_resource(project_id),
+        )
+    except Exception as exc:  # pragma: no cover - depends on local/cloud auth state.
+        warnings.warn(f"Cloud Trace setup skipped: {exc}", stacklevel=2)
+        return
+
+    _CLOUD_TRACE_ENABLED = True
+
+
+maybe_enable_cloud_trace()
 
 
 def model_name() -> str:
@@ -58,8 +93,7 @@ class GoogleCloudAuth(httpx.Auth):
 
 
 def runtime_a2a_httpx_client() -> httpx.AsyncClient | None:
-    use_auth = os.getenv("ACMEDESK_A2A_USE_ADC_AUTH", "").lower() in {"1", "true", "yes"}
-    if not use_auth:
+    if not env_bool("ACMEDESK_A2A_USE_ADC_AUTH"):
         return None
     return httpx.AsyncClient(auth=GoogleCloudAuth(), timeout=httpx.Timeout(timeout=60.0))
 
