@@ -33,6 +33,17 @@ rm -rf "${DEPLOY_WORK_DIR}"/source_* "${DEPLOY_WORK_DIR}"/acmedesk_agent_runtime
   --no-emit-project \
   --output-file "${REQ_FILE}"
 
+# Build a deploy-only env file: drop AI-Studio API key and force Vertex mode so
+# the runtime uses its service account ADC (Vertex SessionService rejects API keys).
+DEPLOY_ENV_FILE="${LOG_DIR}/deploy.env"
+if [[ -f "${REPO_ROOT}/.env" ]]; then
+  grep -v -E '^[[:space:]]*(GOOGLE_API_KEY|GOOGLE_GENAI_USE_VERTEXAI)[[:space:]]*=' \
+    "${REPO_ROOT}/.env" > "${DEPLOY_ENV_FILE}"
+else
+  : > "${DEPLOY_ENV_FILE}"
+fi
+echo "GOOGLE_GENAI_USE_VERTEXAI=true" >> "${DEPLOY_ENV_FILE}"
+
 slugify() {
   printf "%s" "$1" \
     | tr "[:upper:]" "[:lower:]" \
@@ -57,6 +68,13 @@ prepare_deploy_source() {
     "${REPO_ROOT}/" "${source_dir}/"
 
   cat > "${source_dir}/agent.py" <<PY
+import os, sys
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+for _p in (_HERE, os.path.join(_HERE, "src")):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
 from ${agent_module} import root_agent
 PY
 }
@@ -72,8 +90,8 @@ deploy_agent() {
   local log_file="${LOG_DIR}/${agent_slug}.deploy.log"
   local env_args=()
 
-  if [[ -f "${REPO_ROOT}/.env" ]]; then
-    env_args=(--env_file "${REPO_ROOT}/.env")
+  if [[ -f "${DEPLOY_ENV_FILE}" ]]; then
+    env_args=(--env_file "${DEPLOY_ENV_FILE}")
   fi
 
   prepare_deploy_source "${source_dir}" "${agent_module}"

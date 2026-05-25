@@ -25,7 +25,8 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["src", "."]
+include = ["acmedesk_support*", "agents*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src", "."]
