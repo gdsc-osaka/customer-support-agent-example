@@ -59,3 +59,21 @@ def test_adk_agent_entrypoints_import_when_dependencies_exist() -> None:
         ("customer_communication_agent", "build_final_response_input"),
         ("build_final_response_input", "support_coordinator_final_response_agent"),
     } <= graph_edges
+
+
+def test_runtime_a2a_wrapper_registers_a2a_methods(monkeypatch: pytest.MonkeyPatch) -> None:
+    pytest.importorskip("vertexai")
+
+    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "test-project")
+    monkeypatch.setenv("GOOGLE_CLOUD_LOCATION", "us-central1")
+
+    from agents._runtime_a2a import build_runtime_a2a_agent
+    from agents.ticket_history.agent import root_agent as ticket_agent
+
+    runtime_agent = build_runtime_a2a_agent(ticket_agent, description="Ticket history A2A")
+
+    assert runtime_agent.agent_framework == "a2a"
+    assert "handle_authenticated_agent_card" in runtime_agent.register_operations()[
+        "a2a_extension"
+    ]
+    assert "on_message_send" in runtime_agent.register_operations()["a2a_extension"]

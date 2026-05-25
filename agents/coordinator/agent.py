@@ -7,7 +7,7 @@ from google.adk.agents.remote_a2a_agent import RemoteA2aAgent
 from google.adk.events.event import Event
 from google.adk.workflow import JoinNode
 
-from agents._common import build_a2a_app, model_name, specialist_card_url
+from agents._common import build_a2a_app, model_name, runtime_a2a_httpx_client, specialist_card_url
 
 RESEARCH_AGENT_NAMES = (
     "ticket_history_agent",
@@ -63,39 +63,47 @@ def build_final_response_input(ctx: Context) -> str:
     )
 
 
+_remote_a2a_httpx_client = runtime_a2a_httpx_client()
+
 ticket_history_agent = RemoteA2aAgent(
     name="ticket_history_agent",
     agent_card=specialist_card_url("TICKET_HISTORY_A2A_URL", "http://localhost:8101"),
+    httpx_client=_remote_a2a_httpx_client,
     description="Finds similar support tickets and historical resolutions.",
     use_legacy=False,
 )
 knowledge_base_agent = RemoteA2aAgent(
     name="knowledge_base_agent",
     agent_card=specialist_card_url("KNOWLEDGE_BASE_A2A_URL", "http://localhost:8102"),
+    httpx_client=_remote_a2a_httpx_client,
     description="Finds FAQ, troubleshooting, runbook, product, and policy references.",
     use_legacy=False,
 )
 account_context_agent = RemoteA2aAgent(
     name="account_context_agent",
     agent_card=specialist_card_url("ACCOUNT_CONTEXT_A2A_URL", "http://localhost:8103"),
+    httpx_client=_remote_a2a_httpx_client,
     description="Looks up customer account, contract, entitlement, SLA, and health context.",
     use_legacy=False,
 )
 incident_status_agent = RemoteA2aAgent(
     name="incident_status_agent",
     agent_card=specialist_card_url("INCIDENT_STATUS_A2A_URL", "http://localhost:8104"),
+    httpx_client=_remote_a2a_httpx_client,
     description="Checks active and historical incidents for correlation.",
     use_legacy=False,
 )
 escalation_policy_agent = RemoteA2aAgent(
     name="escalation_policy_agent",
     agent_card=specialist_card_url("ESCALATION_POLICY_A2A_URL", "http://localhost:8105"),
+    httpx_client=_remote_a2a_httpx_client,
     description="Recommends severity, SLA deadline, escalation target, and safe customer wording.",
     use_legacy=False,
 )
 customer_communication_agent = RemoteA2aAgent(
     name="customer_communication_agent",
     agent_card=specialist_card_url("CUSTOMER_COMMUNICATION_A2A_URL", "http://localhost:8106"),
+    httpx_client=_remote_a2a_httpx_client,
     description="Generates safe customer-facing response packages from structured briefs.",
     use_legacy=False,
 )
