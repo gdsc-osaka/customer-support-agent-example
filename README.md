@@ -2,32 +2,34 @@
 
 This is the completed repository for the hands-on lab "ADK x A2A x Agent Runtime Customer Support Escalation Agent".
 
-The app models a B2B SaaS support workflow for AcmeDesk. A Support Coordinator Agent receives a customer support inquiry, delegates research and response drafting to six specialist agents over A2A, and produces a Customer Support Escalation Brief for support operators.
+The app models a B2B SaaS support workflow for AcmeDesk. A Support Coordinator Agent receives a customer support inquiry, runs a generic resolution workflow over specialist agents, and produces a Support Case Resolution Package for support operators.
 
 ## Architecture
 
 ```text
 Support Coordinator Agent
-  |- Ticket History Agent       (A2A, port 8101)
-  |- Knowledge Base Agent       (A2A, port 8102)
-  |- Account Context Agent      (A2A, port 8103)
-  |- Incident Status Agent      (A2A, port 8104)
+  |- Ticket History Agent        (A2A, port 8101)
+  |- Knowledge Base Agent        (A2A, port 8102)
+  |- Account Context Agent       (A2A, port 8103)
+  |- Incident Status Agent       (A2A, port 8104)
   |- Escalation Policy Agent     (A2A, port 8105)
-  `- Customer Communication Agent (A2A, port 8106)
+  |- Customer Communication Agent (A2A, port 8106)
+  `- Diagnostics Agent           (A2A, port 8107)
 ```
 
 Each specialist is an ADK agent exposed as an A2A Starlette app with `to_a2a()`.
-The coordinator is a graph-based `Workflow` that consumes the specialists through
-direct `RemoteA2aAgent(use_legacy=False)` graph nodes. The first five graph
-branches start from `START`, so ticket history, knowledge base, account context,
-incident status, and escalation policy run concurrently. A `JoinNode` waits for
-those research and policy branches to complete, then a local function node
-assembles their event text for the coordinator synthesis agent. The customer
-communication A2A agent drafts the customer-facing response package, another
-function node assembles the final response input, and a final coordinator
-synthesis agent produces the final brief. This keeps orchestration deterministic
-and avoids exposing `transfer_to_agent(...)` choices from a coordinator LLM
-agent.
+The coordinator is a graph-based `Workflow` that keeps the case flow generic:
+Triage / Planning, Parallel Investigation, Synthesis / Hypothesis Update,
+Escalation Policy Check, Customer Communication Draft, and Final Package
+Generation. The planning step returns a structured investigation plan, then a
+Python router emits `retry` or `DEFAULT_ROUTE`: `retry` requests clarification
+with ADK human-in-the-loop input before returning to planning, and `DEFAULT_ROUTE`
+enters the support case resolution workflow.
+The planning and synthesis steps are LLM agents, so routing and hypothesis
+updates are not hard-coded to authentication, billing, or any other single
+domain. The parallel investigation stage fans out to Account Context, Ticket
+History, Incident Status, Knowledge Base, and Diagnostics agents; the
+LLM-provided plan tells each specialist what to focus on for the current case.
 
 For deterministic workshop checks, the shared `acmedesk_support` package also exposes local search and brief-building functions. The CLI sample cases use those functions so they can run without calling an LLM. That deterministic path is not registered as a coordinator ADK tool.
 
@@ -48,7 +50,7 @@ Dependencies are managed with `uv` from `pyproject.toml` and `uv.lock`. Do not i
 
 ## Run locally
 
-Start the six specialist A2A services:
+Start the seven specialist A2A services:
 
 ```bash
 make run-specialists
@@ -69,6 +71,7 @@ http://localhost:8103/.well-known/agent-card.json
 http://localhost:8104/.well-known/agent-card.json
 http://localhost:8105/.well-known/agent-card.json
 http://localhost:8106/.well-known/agent-card.json
+http://localhost:8107/.well-known/agent-card.json
 http://localhost:8100/.well-known/agent-card.json
 ```
 
@@ -80,7 +83,7 @@ make case-b
 make case-c
 ```
 
-These commands generate the same Customer Support Escalation Brief shape expected from the coordinator:
+These commands generate deterministic Customer Support Escalation Briefs for local workshop checks:
 
 - Case A: Contoso SAML SSO outage after IdP certificate rotation
 - Case B: Globex billing discrepancy after seat increase

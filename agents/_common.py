@@ -99,9 +99,32 @@ def runtime_a2a_httpx_client() -> httpx.AsyncClient | None:
 
 
 def build_a2a_app(agent, default_port: int):
+    from a2a.types import AgentCapabilities, AgentCard, AgentSkill, TransportProtocol
     from google.adk.a2a.utils.agent_to_a2a import to_a2a
 
     host = os.getenv("A2A_HOST", "localhost")
     protocol = os.getenv("A2A_PROTOCOL", "http")
     port = int(os.getenv("PORT", str(default_port)))
-    return to_a2a(agent, host=host, port=port, protocol=protocol)
+    agent_card = None
+    if not hasattr(agent, "sub_agents"):
+        rpc_url = f"{protocol}://{host}:{port}/"
+        agent_card = AgentCard(
+            name=agent.name,
+            description=agent.description or "An ADK workflow agent",
+            url=rpc_url,
+            version="1.0.0",
+            default_input_modes=["text/plain"],
+            default_output_modes=["text/plain"],
+            capabilities=AgentCapabilities(streaming=False),
+            skills=[
+                AgentSkill(
+                    id=f"{agent.name}_skill",
+                    name=agent.name,
+                    description=agent.description or "Runs the support workflow.",
+                    tags=["adk", "workflow", "a2a"],
+                )
+            ],
+            preferred_transport=TransportProtocol.http_json,
+            supports_authenticated_extended_card=False,
+        )
+    return to_a2a(agent, host=host, port=port, protocol=protocol, agent_card=agent_card)

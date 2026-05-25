@@ -43,6 +43,7 @@ A2A_ENV_NAMES=(
   INCIDENT_STATUS_A2A_URL
   ESCALATION_POLICY_A2A_URL
   CUSTOMER_COMMUNICATION_A2A_URL
+  DIAGNOSTICS_A2A_URL
 )
 
 # --- ANSI styling ---------------------------------------------------------
@@ -517,6 +518,7 @@ SPECIALIST_AGENTS=(
   "Incident Status Agent|agents.incident_status.agent|Correlates support cases with active and historical incidents over A2A.|INCIDENT_STATUS_A2A_URL"
   "Escalation Policy Agent|agents.escalation_policy.agent|Applies AcmeDesk severity, SLA, escalation, and customer-communication policies over A2A.|ESCALATION_POLICY_A2A_URL"
   "Customer Communication Agent|agents.customer_communication.agent|Generates safe customer-facing support response packages over A2A.|CUSTOMER_COMMUNICATION_A2A_URL"
+  "Diagnostics Agent|agents.diagnostics.agent|Recommends diagnostic checks, evidence gaps, and troubleshooting probes over A2A.|DIAGNOSTICS_A2A_URL"
 )
 COORDINATOR_AGENT=(
   "Support Coordinator Agent|agents.coordinator.agent|Coordinates specialist A2A agents and produces Customer Support Escalation Briefs."
