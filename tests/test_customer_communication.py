@@ -1,13 +1,37 @@
 from __future__ import annotations
 
-from hirenest_support.brief import build_escalation_brief
 from hirenest_support.communication import generate_customer_response_package
 
 
 def test_customer_communication_redacts_internal_details_and_requires_review() -> None:
-    brief = build_escalation_brief(
-        "Apex Robotics reports that interview invitation emails are not delivered to all "
-        "candidates for a hiring event. This is a Premier support customer."
+    brief = "\n".join(
+        [
+            "# Coordinator Support Brief",
+            "## Case Summary",
+            (
+                "- Inquiry summary: Apex Robotics reports that interview invitation emails are "
+                "not delivered to all candidates for a hiring event."
+            ),
+            "- Impact scope: all candidates did not receive interview invitations",
+            "- Problem category: candidate_communication",
+            "## Customer Account Context",
+            "- Customer name: Apex Robotics",
+            "- Support tier: Premier",
+            "- ARR $420000",
+            "- Health score 62",
+            "## Similar Historical Tickets",
+            "- TCK-4101 - Interview invitation delivery failures",
+            "## Incident Correlation",
+            "- Related active incident: INC-2026-0524-INVITE-DELIVERY (investigating, SEV2)",
+            (
+                "- Customer-shareable status update: We are investigating delayed interview "
+                "invitation delivery for some customers."
+            ),
+            "## Severity Recommendation",
+            "- Recommended severity: SEV2",
+            "- SLA update frequency: 60 minutes",
+            "- Additional information needed: exact first failure time",
+        ]
     )
 
     package = generate_customer_response_package(brief)

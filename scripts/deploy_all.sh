@@ -519,7 +519,7 @@ SPECIALIST_AGENTS=(
   "Diagnostics Agent|agents.diagnostics.agent|Recommends diagnostic checks, evidence gaps, and troubleshooting probes over A2A.|DIAGNOSTICS_A2A_URL"
 )
 COORDINATOR_AGENT=(
-  "Support Coordinator Agent|agents.coordinator.agent|Coordinates specialist A2A agents and produces Customer Support Escalation Briefs."
+  "Support Coordinator Agent|agents.coordinator.agent|Coordinates specialist A2A agents and produces support case resolution packages."
 )
 AGENTS=("${SPECIALIST_AGENTS[@]}" "${COORDINATOR_AGENT[@]}")
 

@@ -19,23 +19,23 @@ Support Coordinator Agent
 Each specialist is an ADK agent exposed as an A2A Starlette app with `to_a2a()`.
 The coordinator is a graph-based `Workflow` that keeps the case flow generic:
 Triage / Planning, Parallel Investigation, Synthesis / Hypothesis Update,
-and Final Package Generation. The planning step returns a structured
-investigation plan, then a Python router emits `retry` or `DEFAULT_ROUTE`:
-`retry` requests clarification with ADK human-in-the-loop input before returning
-to planning, and `DEFAULT_ROUTE` enters the support case resolution workflow.
+Escalation Policy, and Final Package Generation. The planning step returns a
+structured investigation plan, then a Python router emits `retry` or
+`DEFAULT_ROUTE`: `retry` requests clarification with ADK human-in-the-loop input
+before returning to planning, and `DEFAULT_ROUTE` enters the support case
+resolution workflow.
+
 The planning and synthesis steps are LLM agents, so routing and hypothesis
 updates are not hard-coded to candidate email, calendar sync, job pages, or any
-other single domain. The parallel investigation stage fans out to Account Context, Ticket
-History, Incident Status, Knowledge Base, and Diagnostics agents; the
-LLM-provided plan tells each specialist what to focus on for the current case.
-After synthesis, the coordinator calls the Escalation Policy Agent over A2A to
-apply severity, SLA, owner-team, escalation, and Discord notification policy.
-It then combines that policy result with a deterministic customer-communication
-safety draft before passing the package input to the final package agent. This
-keeps the graph focused on the orchestration boundary while still making
-escalation policy a real specialist-agent handoff.
-
-For deterministic workshop checks, the shared `hirenest_support` package also exposes local search and brief-building functions. The CLI sample cases use those functions so they can run without calling an LLM. That deterministic path is not registered as a coordinator ADK tool.
+other single domain. The parallel investigation stage fans out to Account
+Context, Ticket History, Incident Status, Knowledge Base, and Diagnostics
+agents; the LLM-provided plan tells each specialist what to focus on for the
+current case. After synthesis, the coordinator calls the Escalation Policy Agent
+over A2A to apply severity, SLA, owner-team, escalation, and Discord
+notification policy. It then combines that policy result with a deterministic
+customer-communication safety draft before passing the package input to the
+final package agent. This keeps the graph focused on the orchestration boundary
+while still making escalation policy a real specialist-agent handoff.
 
 ## Setup
 
@@ -64,7 +64,14 @@ Dependencies are managed with `uv` from `pyproject.toml` and `uv.lock`. Do not i
 
 ## Run locally
 
-Start the local A2A services:
+Start the specialists, coordinator, and ADK Web together:
+
+```bash
+make run
+```
+
+Or run each service group in separate terminals. First start the local A2A
+specialist services:
 
 ```bash
 make run-specialists
@@ -88,25 +95,25 @@ http://localhost:8107/.well-known/agent-card.json
 http://localhost:8100/.well-known/agent-card.json
 ```
 
-## Run sample cases without an LLM
+Start ADK Web only:
 
 ```bash
-make case-a
-make case-b
-make case-c
+make web
 ```
 
-These commands generate deterministic Customer Support Escalation Briefs for local workshop checks:
-
-- Case A: Apex Robotics interview invitation emails not delivered
-- Case B: BlueWave Health Google Calendar availability missing
-- Case C: ClearPath Logistics public job application form missing
+ADK Web listens on `http://localhost:8000`.
 
 ## Test and lint
 
 ```bash
 make lint
 make test
+```
+
+Refresh the lockfile after dependency changes:
+
+```bash
+make lock
 ```
 
 ## Deploy to Agent Platform Agent Runtime
@@ -137,7 +144,10 @@ Deploy every agent:
 make deploy-all
 ```
 
-The script exports dependencies from the uv lockfile:
+The deployment script loads defaults from `.env`, exports dependencies from the
+uv lockfile, deploys specialists in parallel, writes authenticated specialist
+A2A card URLs into the coordinator deployment environment, then deploys the
+coordinator:
 
 ```bash
 uv export --format requirements.txt --no-dev --no-hashes --no-emit-project \
@@ -152,12 +162,19 @@ After the specialist Agent Runtime resources are created, the script writes thei
 
 Agent2Agent on Agent Runtime is currently a preview workflow. Keep local A2A URLs for workshop development and use runtime endpoints for the deployment exercise.
 
+To clean up deployed Reasoning Engine resources created by this lab, use:
+
+```bash
+./scripts/cleanup_all.sh --dry-run
+./scripts/cleanup_all.sh
+```
+
 ## Repository layout
 
 ```text
-agents/                  ADK agent entrypoints
-data/                    Fictional HireNest ATS support corpus
-scripts/                 CLI runners and deployment helpers
-src/hirenest_support/    Deterministic data search and brief logic
-tests/                   Unit and sample-case tests
+agents/                  ADK coordinator and specialist agent entrypoints
+data/                    Fictional HireNest ATS tickets, accounts, incidents, KB, product, and policy fixtures
+scripts/                 Agent Runtime deployment and cleanup helpers
+src/hirenest_support/    Deterministic search, policy, diagnostics, communication, and redaction logic
+tests/                   Unit and agent-import tests
 ```
