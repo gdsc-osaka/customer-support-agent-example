@@ -10,7 +10,6 @@ ENV_NAMES = {
     "account_context": "ACCOUNT_CONTEXT_A2A_URL",
     "incident_status": "INCIDENT_STATUS_A2A_URL",
     "escalation_policy": "ESCALATION_POLICY_A2A_URL",
-    "customer_communication": "CUSTOMER_COMMUNICATION_A2A_URL",
 }
 
 

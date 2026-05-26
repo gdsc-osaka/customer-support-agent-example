@@ -14,9 +14,6 @@ Support Coordinator Agent
   |- Incident Status Agent       (A2A, port 8104)
   |- Escalation Policy Agent     (A2A, port 8105)
   `- Diagnostics Agent           (A2A, port 8107)
-
-Standalone A2A entrypoints
-  `- Customer Communication Agent (A2A, port 8106)
 ```
 
 Each specialist is an ADK agent exposed as an A2A Starlette app with `to_a2a()`.
@@ -87,7 +84,6 @@ http://localhost:8102/.well-known/agent-card.json
 http://localhost:8103/.well-known/agent-card.json
 http://localhost:8104/.well-known/agent-card.json
 http://localhost:8105/.well-known/agent-card.json
-http://localhost:8106/.well-known/agent-card.json
 http://localhost:8107/.well-known/agent-card.json
 http://localhost:8100/.well-known/agent-card.json
 ```

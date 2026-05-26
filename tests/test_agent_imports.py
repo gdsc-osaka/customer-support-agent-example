@@ -10,7 +10,6 @@ def test_adk_agent_entrypoints_import_when_dependencies_exist() -> None:
 
     from agents.account_context.agent import root_agent as account_agent
     from agents.coordinator.agent import root_agent as coordinator_agent
-    from agents.customer_communication.agent import root_agent as communication_agent
     from agents.diagnostics.agent import root_agent as diagnostics_agent
     from agents.escalation_policy.agent import root_agent as policy_agent
     from agents.incident_status.agent import root_agent as incident_agent
@@ -23,7 +22,6 @@ def test_adk_agent_entrypoints_import_when_dependencies_exist() -> None:
     assert diagnostics_agent.name == "diagnostics_agent"
     assert incident_agent.name == "incident_status_agent"
     assert policy_agent.name == "escalation_policy_agent"
-    assert communication_agent.name == "customer_communication_agent"
     assert coordinator_agent.name == "support_coordinator_agent"
     assert coordinator_agent.graph is not None
 

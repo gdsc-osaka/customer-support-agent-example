@@ -32,9 +32,8 @@ run-specialists:
 	PYTHONPATH=src $(UV_RUN) uvicorn agents.account_context.agent:app --host 0.0.0.0 --port 8103 & \
 	PYTHONPATH=src $(UV_RUN) uvicorn agents.incident_status.agent:app --host 0.0.0.0 --port 8104 & \
 	PYTHONPATH=src $(UV_RUN) uvicorn agents.escalation_policy.agent:app --host 0.0.0.0 --port 8105 & \
-	PYTHONPATH=src $(UV_RUN) uvicorn agents.customer_communication.agent:app --host 0.0.0.0 --port 8106 & \
 	PYTHONPATH=src $(UV_RUN) uvicorn agents.diagnostics.agent:app --host 0.0.0.0 --port 8107 & \
-	echo "Specialist A2A agents are running on ports 8101-8107."; \
+	echo "Specialist A2A agents are running on ports 8101-8105 and 8107."; \
 	wait
 
 run-coordinator:
