@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from google.adk import Agent, Context
 from google.adk.agents.remote_a2a_agent import RemoteA2aAgent
 from google.adk.tools.agent_tool import AgentTool
-from google.adk.workflow import node
 
 from agents._common import remote_agent_card_url, runtime_a2a_httpx_client
 from agents.coordinator.candidates import (
@@ -77,15 +75,16 @@ def build_evaluation_input(ctx: Context, node_input: Any) -> str:
     )
 
 
-evaluation_coordinator_agent = Agent(
-    name="multi_agent_evaluation_coordinator",
+evaluation_agent = Agent(
+    name="multi_agent_evaluation",
     model=EVALUATION_AGENT_MODEL,
     description="Evaluates travel candidates with specialists and reconciles them into rankings.",
     output_schema=CoordinatorRecommendation,
     instruction=(
         "あなたは旅行候補評価の coordinator です。\n"
         "以下のワークフローに従ってください。\n"
-        "1. comfort_agent、risk_agent、experience_agent の全員に分析を依頼する\n"
+        "1. comfort_agent、risk_agent、experience_agent の全員に分析を依頼する。"
+        "TravelRequest、TravelOptions、ResearchReports の中身は展開し各エージェントが必要な情報を渡してください。\n"
         "  - comfort_agent には移動負荷、休憩、宿泊快適性、疲労しにくさを分析させてください。\n"
         "  - risk_agent には休業、混雑、天候、予約困難、交通遅延、不確実性を分析させてください。\n"
         "  - experience_agent には非日常性、記憶に残る体験、嗜好一致を分析させてください。\n"
@@ -105,53 +104,5 @@ evaluation_coordinator_agent = Agent(
         AgentTool(risk_agent),
         AgentTool(experience_agent),
     ],
-    mode="chat",
+    mode="single_turn",
 )
-
-
-def parse_coordinator_recommendation(value: Any) -> CoordinatorRecommendation:
-    if isinstance(value, CoordinatorRecommendation):
-        return value
-    if isinstance(value, dict):
-        return CoordinatorRecommendation.model_validate(value)
-
-    raw = text(value)
-    if raw.startswith("```json"):
-        raw = raw.removeprefix("```json").removesuffix("```").strip()
-    elif raw.startswith("```"):
-        raw = raw.removeprefix("```").removesuffix("```").strip()
-
-    try:
-        return CoordinatorRecommendation.model_validate_json(raw)
-    except Exception:
-        start = raw.find("{")
-        end = raw.rfind("}")
-        if start == -1 or end == -1 or end <= start:
-            raise
-        return CoordinatorRecommendation.model_validate(json.loads(raw[start : end + 1]))
-
-
-def last_model_text(ctx: Context, author: str) -> str:
-    for event in reversed(ctx.session.events):
-        if event.author != author:
-            continue
-        if event.get_function_calls() or event.get_function_responses():
-            continue
-        if not event.content or not event.content.parts:
-            continue
-        event_text = "".join(
-            part.text or "" for part in event.content.parts if not part.thought
-        ).strip()
-        if event_text:
-            return event_text
-    return ""
-
-
-@node(name="multi_agent_evaluation", rerun_on_resume=True)
-async def evaluation_agent(ctx: Context, node_input: Any) -> CoordinatorRecommendation:
-    output = await ctx.run_node(evaluation_coordinator_agent, node_input)
-    if output:
-        return parse_coordinator_recommendation(output)
-    return parse_coordinator_recommendation(
-        last_model_text(ctx, evaluation_coordinator_agent.name)
-    )
