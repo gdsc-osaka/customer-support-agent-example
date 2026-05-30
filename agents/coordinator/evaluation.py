@@ -32,6 +32,11 @@ EVALUATION_AGENT_MODEL = "gemini-3.1-pro-preview"
 
 _remote_a2a_httpx_client = runtime_a2a_httpx_client()
 
+
+# --- Agents -----------------------------------------------------------------
+# Specialist remote agents are declared first because the orchestrator below
+# references them as AgentTools at construction time.
+
 comfort_agent = RemoteA2aAgent(
     name="comfort_agent",
     agent_card=remote_agent_card_url("COMFORT_A2A_URL", "http://localhost:8101"),
@@ -58,22 +63,6 @@ experience_agent = RemoteA2aAgent(
     output_schema=EvaluationReport,
     use_legacy=False,
 )
-
-
-def build_evaluation_input(ctx: Context, node_input: Any) -> str:
-    research_reports = node_input or ctx.state.get(STATE_RESEARCH_REPORTS)
-    return "\n\n".join(
-        [
-            "TravelRequest、TravelOptions、ResearchReports を根拠に全候補を比較評価してください。",
-            "TravelRequest:",
-            text(ctx.state.get(STATE_TRAVEL_REQUEST)),
-            "TravelOptions:",
-            text(ctx.state.get(STATE_TRAVEL_OPTIONS)),
-            "ResearchReports keyed by option_id:",
-            text(research_reports),
-        ]
-    )
-
 
 evaluation_agent = Agent(
     name="multi_agent_evaluation",
@@ -107,3 +96,20 @@ evaluation_agent = Agent(
     ],
     mode="single_turn",
 )
+
+
+# --- Workflow nodes ---------------------------------------------------------
+
+def build_evaluation_input(ctx: Context, node_input: Any) -> str:
+    research_reports = node_input or ctx.state.get(STATE_RESEARCH_REPORTS)
+    return "\n\n".join(
+        [
+            "TravelRequest、TravelOptions、ResearchReports を根拠に全候補を比較評価してください。",
+            "TravelRequest:",
+            text(ctx.state.get(STATE_TRAVEL_REQUEST)),
+            "TravelOptions:",
+            text(ctx.state.get(STATE_TRAVEL_OPTIONS)),
+            "ResearchReports keyed by option_id:",
+            text(research_reports),
+        ]
+    )

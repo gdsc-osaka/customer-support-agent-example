@@ -51,6 +51,9 @@ PLANNER_AGENT_MODEL = "gemini-3.5-flash"
 ILLUSTRATOR_PROMPT_AGENT_MODEL = "gemini-3.1-pro-preview"
 ILLUSTRATOR_AGENT_MODEL = "gemini-3-pro-image"
 
+
+# --- Agents -----------------------------------------------------------------
+
 planner_agent = Agent(
     name="planner",
     model=PLANNER_AGENT_MODEL,
@@ -98,6 +101,9 @@ illustrator_agent = Agent(
     mode="single_turn",
 )
 
+
+# --- Workflow nodes ---------------------------------------------------------
+
 def store_recommendation(
     ctx: Context,
     node_input: CoordinatorRecommendation,
@@ -139,73 +145,6 @@ def route_user_selection(ctx: Context, node_input: Any):
             break
     ctx.state[STATE_SELECTED_OPTION_ID] = selected.option_id
     yield Event(route=ROUTE_SELECTED, output=selected.option_id)
-
-
-def build_replan_input(ctx: Context, node_input: Any) -> str:
-    return "\n\n".join(
-        [
-            "現在のTravelRequest:",
-            text(ctx.state.get(STATE_TRAVEL_REQUEST)),
-            "現在の推薦:",
-            text(ctx.state.get(STATE_COORDINATOR_RECOMMENDATION)),
-            "ユーザーの変更希望:",
-            text(node_input),
-            "条件変更を反映した TravelRequest を作り直してください。",
-        ]
-    )
-
-
-def parse_evaluation_reports(value: Any) -> list[EvaluationReport]:
-    if isinstance(value, str):
-        stripped = value.strip()
-        if stripped.startswith("```json"):
-            stripped = stripped.removeprefix("```json").removesuffix("```").strip()
-        elif stripped.startswith("```"):
-            stripped = stripped.removeprefix("```").removesuffix("```").strip()
-        if not stripped:
-            return []
-        value = json.loads(stripped)
-
-    if isinstance(value, dict):
-        return EvaluationReports.model_validate(value).reports
-
-    return [EvaluationReport.model_validate(item) for item in value or []]
-
-
-def build_selected_option_context(ctx: Context, node_input: Any) -> SelectedOptionContext:
-    selected_option_id = ctx.state.get(STATE_SELECTED_OPTION_ID) or text(node_input)
-    options = [
-        TravelOption.model_validate(item)
-        for item in ctx.state.get(STATE_TRAVEL_OPTIONS, [])
-    ]
-    reports = {
-        key: ResearchReport.model_validate(value)
-        for key, value in ctx.state.get(STATE_RESEARCH_REPORTS, {}).items()
-    }
-    evaluations = parse_evaluation_reports(ctx.state.get(STATE_REVISED_EVALUATIONS))
-    recommendation = CoordinatorRecommendation.model_validate(
-        ctx.state[STATE_COORDINATOR_RECOMMENDATION]
-    )
-    selected_option = next(option for option in options if option.option_id == selected_option_id)
-    selected_recommendation = next(
-        (item for item in recommendation.ranked_options if item.option_id == selected_option_id),
-        None,
-    )
-    selected_evaluations = [
-        evaluation
-        for evaluation in evaluations
-        if evaluation.score_for(selected_option_id) is not None
-    ]
-    context = SelectedOptionContext(
-        travel_request=TravelRequest.model_validate(ctx.state[STATE_TRAVEL_REQUEST]),
-        selected_option=selected_option,
-        research_report=reports[selected_option_id],
-        evaluations=selected_evaluations,
-        recommendation=selected_recommendation,
-        coordinator_notes=recommendation.conflict_resolution,
-    )
-    ctx.state[STATE_SELECTED_OPTION_CONTEXT] = context.model_dump()
-    return context
 
 
 def build_planner_input(ctx: Context, node_input: Any) -> str:
@@ -274,6 +213,20 @@ def build_planner_input(ctx: Context, node_input: Any) -> str:
     )
 
 
+def build_replan_input(ctx: Context, node_input: Any) -> str:
+    return "\n\n".join(
+        [
+            "現在のTravelRequest:",
+            text(ctx.state.get(STATE_TRAVEL_REQUEST)),
+            "現在の推薦:",
+            text(ctx.state.get(STATE_COORDINATOR_RECOMMENDATION)),
+            "ユーザーの変更希望:",
+            text(node_input),
+            "条件変更を反映した TravelRequest を作り直してください。",
+        ]
+    )
+
+
 def store_itinerary_markdown(ctx: Context, node_input: Any) -> str:
     markdown = text(node_input)
     ctx.state[STATE_ITINERARY_MARKDOWN] = markdown
@@ -284,3 +237,58 @@ def store_illustrator_prompt(ctx: Context, node_input: Any) -> str:
     prompt = text(node_input)
     ctx.state[STATE_ILLUSTRATOR_PROMPT] = prompt
     return prompt
+
+
+# --- Helpers ----------------------------------------------------------------
+
+def parse_evaluation_reports(value: Any) -> list[EvaluationReport]:
+    if isinstance(value, str):
+        stripped = value.strip()
+        if stripped.startswith("```json"):
+            stripped = stripped.removeprefix("```json").removesuffix("```").strip()
+        elif stripped.startswith("```"):
+            stripped = stripped.removeprefix("```").removesuffix("```").strip()
+        if not stripped:
+            return []
+        value = json.loads(stripped)
+
+    if isinstance(value, dict):
+        return EvaluationReports.model_validate(value).reports
+
+    return [EvaluationReport.model_validate(item) for item in value or []]
+
+
+def build_selected_option_context(ctx: Context, node_input: Any) -> SelectedOptionContext:
+    selected_option_id = ctx.state.get(STATE_SELECTED_OPTION_ID) or text(node_input)
+    options = [
+        TravelOption.model_validate(item)
+        for item in ctx.state.get(STATE_TRAVEL_OPTIONS, [])
+    ]
+    reports = {
+        key: ResearchReport.model_validate(value)
+        for key, value in ctx.state.get(STATE_RESEARCH_REPORTS, {}).items()
+    }
+    evaluations = parse_evaluation_reports(ctx.state.get(STATE_REVISED_EVALUATIONS))
+    recommendation = CoordinatorRecommendation.model_validate(
+        ctx.state[STATE_COORDINATOR_RECOMMENDATION]
+    )
+    selected_option = next(option for option in options if option.option_id == selected_option_id)
+    selected_recommendation = next(
+        (item for item in recommendation.ranked_options if item.option_id == selected_option_id),
+        None,
+    )
+    selected_evaluations = [
+        evaluation
+        for evaluation in evaluations
+        if evaluation.score_for(selected_option_id) is not None
+    ]
+    context = SelectedOptionContext(
+        travel_request=TravelRequest.model_validate(ctx.state[STATE_TRAVEL_REQUEST]),
+        selected_option=selected_option,
+        research_report=reports[selected_option_id],
+        evaluations=selected_evaluations,
+        recommendation=selected_recommendation,
+        coordinator_notes=recommendation.conflict_resolution,
+    )
+    ctx.state[STATE_SELECTED_OPTION_CONTEXT] = context.model_dump()
+    return context

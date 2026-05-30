@@ -1,3 +1,17 @@
+"""Adapters that expose ADK agents through the Vertex AI Reasoning Engine A2A runtime.
+
+The Reasoning Engine A2A template (``vertexai.preview.reasoning_engines.templates.a2a``)
+expects an ``A2aAgentExecutor`` factory plus an ``AgentCard``. This module
+provides:
+
+* :class:`AdkRuntimeA2aExecutor` — an ``A2aAgentExecutor`` that lazily builds
+  an ADK :class:`~google.adk.runners.Runner` backed by in-memory session,
+  artifact, memory, and credential services (suitable for the stateless
+  Reasoning Engine deployment model).
+* :func:`build_runtime_a2a_agent` — wraps an ADK agent into an ``A2aAgent`` so
+  it can be deployed via ``scripts/deploy_all.sh``.
+"""
+
 from __future__ import annotations
 
 import os
@@ -17,6 +31,14 @@ from vertexai.preview.reasoning_engines.templates.a2a import A2aAgent
 
 
 class AdkRuntimeA2aExecutor(A2aAgentExecutor):
+    """A2A executor that runs an ADK agent inside Vertex AI Reasoning Engine.
+
+    The parent class invokes the supplied ``runner`` factory per request, which
+    keeps the in-memory services (session/artifact/memory/credential) scoped to
+    a single invocation — matching the stateless deployment model of Reasoning
+    Engine.
+    """
+
     def __init__(self, adk_agent: BaseAgent) -> None:
         def create_runner() -> Runner:
             return Runner(
@@ -32,6 +54,13 @@ class AdkRuntimeA2aExecutor(A2aAgentExecutor):
 
 
 def build_runtime_a2a_agent(adk_agent: BaseAgent, *, description: str) -> A2aAgent:
+    """Wrap an ADK agent in a Reasoning Engine ``A2aAgent`` for deployment.
+
+    Initializes the Vertex AI SDK when ``GOOGLE_CLOUD_PROJECT`` and a location
+    env var are present, then builds an ``AgentCard`` (the ``url`` field is a
+    placeholder — Reasoning Engine rewrites it at deploy time) wired to
+    :class:`AdkRuntimeA2aExecutor`.
+    """
     project = os.getenv("GOOGLE_CLOUD_PROJECT")
     location = os.getenv("GOOGLE_CLOUD_LOCATION") or os.getenv("GOOGLE_CLOUD_REGION")
     if project and location:

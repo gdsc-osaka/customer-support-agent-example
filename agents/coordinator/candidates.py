@@ -25,6 +25,21 @@ RESEARCH_AGENT_MODEL = "gemini-3.1-flash-lite"
 RESEARCH_REPORT_FORMATTER_MODEL = "gemini-3.1-flash-lite"
 
 
+# --- Workflows ---------------------------------------------------------
+
+@node(name="travel_research_workflow", rerun_on_resume=True)
+async def travel_research_workflow(ctx: Context, node_input: Any) -> dict[str, dict[str, Any]]:
+    options = ctx.state.get(STATE_TRAVEL_OPTIONS)
+    if not options and isinstance(node_input, TravelOptions):
+        options = [option.model_dump() for option in node_input.options]
+        ctx.state[STATE_TRAVEL_OPTIONS] = options
+
+    tasks = [ctx.run_node(research_candidate, option) for option in options or []]
+    reports = await asyncio.gather(*tasks)
+    return collect_research_reports(ctx, reports)
+
+# --- Agents -----------------------------------------------------------------
+
 strategist_agent = Agent(
     name="strategist",
     model=STRATEGIST_AGENT_MODEL,
@@ -70,10 +85,23 @@ research_report_formatter = Agent(
 )
 
 
+# --- Workflow nodes ---------------------------------------------------------
+
 def store_travel_options(ctx: Context, node_input: TravelOptions) -> TravelOptions:
     ctx.state[STATE_TRAVEL_OPTIONS] = [option.model_dump() for option in node_input.options]
     return node_input
 
+@node(name="research_candidate", rerun_on_resume=True)
+async def research_candidate(ctx: Context, node_input: dict[str, Any]) -> ResearchReport:
+    request = ctx.state.get(STATE_TRAVEL_REQUEST, {})
+    research_memo = await ctx.run_node(research_agent, build_research_input(request, node_input))
+    return await ctx.run_node(
+        research_report_formatter,
+        build_research_report_input(request, node_input, research_memo),
+    )
+
+
+# --- Helpers ----------------------------------------------------------------
 
 def build_research_input(request: Any, option: Any) -> str:
     return "\n\n".join(
@@ -118,25 +146,3 @@ def collect_research_reports(ctx: Context, node_input: Any) -> dict[str, dict[st
             reports[data["option_id"]] = data
     ctx.state[STATE_RESEARCH_REPORTS] = reports
     return reports
-
-
-@node(name="research_candidate", rerun_on_resume=True)
-async def research_candidate(ctx: Context, node_input: dict[str, Any]) -> ResearchReport:
-    request = ctx.state.get(STATE_TRAVEL_REQUEST, {})
-    research_memo = await ctx.run_node(research_agent, build_research_input(request, node_input))
-    return await ctx.run_node(
-        research_report_formatter,
-        build_research_report_input(request, node_input, research_memo),
-    )
-
-
-@node(name="travel_research_workflow", rerun_on_resume=True)
-async def travel_research_workflow(ctx: Context, node_input: Any) -> dict[str, dict[str, Any]]:
-    options = ctx.state.get(STATE_TRAVEL_OPTIONS)
-    if not options and isinstance(node_input, TravelOptions):
-        options = [option.model_dump() for option in node_input.options]
-        ctx.state[STATE_TRAVEL_OPTIONS] = options
-
-    tasks = [ctx.run_node(research_candidate, option) for option in options or []]
-    reports = await asyncio.gather(*tasks)
-    return collect_research_reports(ctx, reports)
