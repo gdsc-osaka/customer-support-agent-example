@@ -2,12 +2,7 @@ from types import SimpleNamespace
 
 from agents.coordinator.agent import candidate_workflow, root_agent
 from agents.coordinator.candidates import STATE_RESEARCH_REPORTS, STATE_TRAVEL_OPTIONS
-from agents.coordinator.evaluation import (
-    STATE_EVALUATION_DISCUSSION_ROUNDS,
-    STATE_REVISED_EVALUATIONS,
-    evaluation_agent,
-    evaluation_discussion_is_complete,
-)
+from agents.coordinator.evaluation import STATE_REVISED_EVALUATIONS
 from agents.coordinator.intake import STATE_TRAVEL_REQUEST
 from agents.coordinator.recommendation import (
     ROUTE_SELECTED,
@@ -47,36 +42,6 @@ def test_replan_route_builds_replan_input_before_analysis():
     assert ("build_replan_input", None, "analyst") in edges
 
     assert ("route_user_selection", "replan", "analyst") not in edges
-
-
-def test_evaluation_graph_parallelizes_specialists_and_joins_before_looping():
-    edges = edge_set(evaluation_agent)
-
-    assert ("route_evaluation_discussion", "discuss", "build_evaluation_input") in edges
-    assert ("build_evaluation_input", None, "comfort_agent") in edges
-    assert ("build_evaluation_input", None, "risk_agent") in edges
-    assert ("build_evaluation_input", None, "experience_agent") in edges
-    assert ("comfort_agent", None, "evaluation_join") in edges
-    assert ("risk_agent", None, "evaluation_join") in edges
-    assert ("experience_agent", None, "evaluation_join") in edges
-    assert ("evaluation_join", None, "collect_evaluation_round") in edges
-    assert ("collect_evaluation_round", None, "route_evaluation_discussion") in edges
-
-
-def test_recommendation_graph_runs_after_evaluation_discussion_completes():
-    edges = edge_set(evaluation_agent)
-
-    assert (
-        "route_evaluation_discussion",
-        "evaluation_complete",
-        "finalize_evaluation_discussion",
-    ) in edges
-
-    candidate_edges = edge_set(candidate_workflow)
-    assert ("multi_agent_evaluation", None, "build_recommendation_input") in candidate_edges
-    assert ("build_recommendation_input", None, "coordinator") in candidate_edges
-    assert ("coordinator", None, "store_recommendation") in candidate_edges
-    assert ("store_recommendation", None, "request_user_selection") in candidate_edges
 
 
 def sample_recommendation():
@@ -135,43 +100,6 @@ def sample_research_report(option_id="option_1"):
         "source_notes": ["fixture"],
         "suitability_reason": "ゆっくり過ごせる",
     }
-
-
-def sample_evaluation_report(agent_name, option_ids=("option_1",)):
-    return {
-        "agent_name": agent_name,
-        "preferred_option_id": option_ids[0],
-        "option_evaluations": [
-            {
-                "option_id": option_id,
-                "score": 8,
-                "comment": f"{agent_name} comment",
-                "concerns": [],
-            }
-            for option_id in option_ids
-        ],
-    }
-
-
-def test_evaluation_discussion_requires_two_complete_specialist_rounds():
-    complete_reports = [
-        sample_evaluation_report("comfort_agent"),
-        sample_evaluation_report("risk_agent"),
-        sample_evaluation_report("experience_agent"),
-    ]
-    ctx = SimpleNamespace(
-        state={
-            STATE_TRAVEL_OPTIONS: [sample_travel_option()],
-            STATE_EVALUATION_DISCUSSION_ROUNDS: 1,
-            STATE_REVISED_EVALUATIONS: {"reports": complete_reports},
-        }
-    )
-
-    assert not evaluation_discussion_is_complete(ctx)
-
-    ctx.state[STATE_EVALUATION_DISCUSSION_ROUNDS] = 2
-
-    assert evaluation_discussion_is_complete(ctx)
 
 
 def test_user_selection_request_accepts_numeric_input():

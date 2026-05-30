@@ -32,6 +32,25 @@ http-server = [
 ]
 
 [[package]]
+name = "ag-ui-adk"
+version = "0.6.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "ag-ui-protocol" },
+    { name = "aiohttp" },
+    { name = "asyncio" },
+    { name = "fastapi" },
+    { name = "google-adk" },
+    { name = "pydantic" },
+    { name = "sse-starlette" },
+    { name = "uvicorn" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/02/db/b146b69d98ce13dbc6a5e0f836976b279f9411ea5b9454c6cc2f7accd6c0/ag_ui_adk-0.6.5.tar.gz", hash = "sha256:0d1b415f424d4addd876f8c991b3847eaa6a2febe2dc859a6a5e8966b164b400", size = 81328, upload-time = "2026-05-28T07:34:07.737Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/14/47/0f16e065c1a26cb1512a028abc9dac350c9a0656b92a12712a7da8b11b29/ag_ui_adk-0.6.5-py3-none-any.whl", hash = "sha256:c8d0af9838e713161df55bcd72977c288388811fb424283ba050933d12cc704f", size = 87595, upload-time = "2026-05-28T07:34:08.707Z" },
+]
+
+[[package]]
 name = "ag-ui-protocol"
 version = "0.1.18"
 source = { registry = "https://pypi.org/simple" }
@@ -205,6 +224,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/19/14/2c5dd9f512b66549ae92767a9c7b330ae88e1932ca57876909410251fe13/anyio-4.13.0.tar.gz", hash = "sha256:334b70e641fd2221c1505b3890c69882fe4a2df910cba14d97019b90b24439dc", size = 231622, upload-time = "2026-03-24T12:59:09.671Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/da/42/e921fccf5015463e32a3cf6ee7f980a6ed0f395ceeaa45060b61d86486c2/anyio-4.13.0-py3-none-any.whl", hash = "sha256:08b310f9e24a9594186fd75b4f73f4a4152069e3853f1ed8bfbf58369f4ad708", size = 114353, upload-time = "2026-03-24T12:59:08.246Z" },
+]
+
+[[package]]
+name = "asyncio"
+version = "4.0.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/71/ea/26c489a11f7ca862d5705db67683a7361ce11c23a7b98fc6c2deaeccede2/asyncio-4.0.0.tar.gz", hash = "sha256:570cd9e50db83bc1629152d4d0b7558d6451bb1bfd5dfc2e935d96fc2f40329b", size = 5371, upload-time = "2025-08-05T02:51:46.605Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/57/64/eff2564783bd650ca25e15938d1c5b459cda997574a510f7de69688cb0b4/asyncio-4.0.0-py3-none-any.whl", hash = "sha256:c1eddb0659231837046809e68103969b2bef8b0400d59cfa6363f6b5ed8cc88b", size = 5555, upload-time = "2025-08-05T02:51:45.767Z" },
 ]
 
 [[package]]
@@ -510,7 +538,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "a2a-sdk", extra = ["http-server"] },
-    { name = "ag-ui-protocol" },
+    { name = "ag-ui-adk" },
     { name = "fastapi" },
     { name = "google-adk", extra = ["a2a"] },
     { name = "google-cloud-aiplatform", extra = ["agent-engines"] },
@@ -529,7 +557,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "a2a-sdk", extras = ["http-server"], specifier = "==0.3.26" },
-    { name = "ag-ui-protocol", specifier = "==0.1.18" },
+    { name = "ag-ui-adk", specifier = ">=0.6.5" },
     { name = "fastapi", specifier = "==0.136.3" },
     { name = "google-adk", extras = ["a2a"], specifier = "==2.1.0" },
     { name = "google-cloud-aiplatform", extras = ["agent-engines"], specifier = "==1.153.1" },

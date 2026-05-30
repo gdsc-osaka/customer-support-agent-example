@@ -30,6 +30,9 @@ run-specialists:
 	PYTHONPATH=. $(UV_RUN) uvicorn agents.comfort.agent:app --host 0.0.0.0 --port 8101 & \
 	PYTHONPATH=. $(UV_RUN) uvicorn agents.risk.agent:app --host 0.0.0.0 --port 8102 & \
 	PYTHONPATH=. $(UV_RUN) uvicorn agents.experience.agent:app --host 0.0.0.0 --port 8103 & \
+	PYTHONPATH=. uv run uvicorn agents.collaborative_summary.agent:app --host 0.0.0.0 --port 8111 & \
+	PYTHONPATH=. uv run uvicorn agents.collaborative_ideas.agent:app --host 0.0.0.0 --port 8112 & \
+	PYTHONPATH=. uv run uvicorn agents.collaborative.agent:app --host 0.0.0.0 --port 8110 & \
 	echo "Specialist A2A agents are running on ports 8101-8103."; \
 	wait
 

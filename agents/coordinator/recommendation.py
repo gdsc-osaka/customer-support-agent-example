@@ -47,23 +47,8 @@ STATE_SELECTED_OPTION_ID = "selected_option_id"
 STATE_SELECTED_OPTION_CONTEXT = "selected_option_context"
 STATE_DETAILED_ITINERARY = "detailed_itinerary"
 
-COORDINATOR_AGENT_MODEL = "gemini-3.5-flash"
 PLANNER_AGENT_MODEL = "gemini-3.5-flash"
 ILLUSTRATOR_AGENT_MODEL = "gemini-3-pro-image"
-
-
-coordinator_agent = Agent(
-    name="coordinator",
-    model=COORDINATOR_AGENT_MODEL,
-    description="評価の衝突を調停し、推薦順位、理由、注意点を出す。",
-    output_schema=CoordinatorRecommendation,
-    instruction=(
-        "TravelOption、ResearchReport、revised EvaluationReport を統合し、"
-        "評価軸の衝突を調停してください。推薦順位、理由、注意点を作ります。"
-        "ユーザーに提示する ranked_options は最大3案です。"
-    ),
-    mode="single_turn",
-)
 
 planner_agent = Agent(
     name="planner",
@@ -89,21 +74,6 @@ illustrator_agent = Agent(
     mode="single_turn",
 )
 
-
-def build_recommendation_input(ctx: Context, node_input: Any) -> str:
-    return "\n\n".join(
-        [
-            "TravelOptions:",
-            text(ctx.state.get(STATE_TRAVEL_OPTIONS)),
-            "ResearchReports:",
-            text(ctx.state.get(STATE_RESEARCH_REPORTS)),
-            "Revised EvaluationReports:",
-            text(ctx.state.get(STATE_REVISED_EVALUATIONS)),
-            f"評価軸の衝突を調停し、ユーザーに見せる候補は最大{MAX_USER_VISIBLE_OPTIONS}案にしてください。",
-        ]
-    )
-
-
 def store_recommendation(
     ctx: Context,
     node_input: CoordinatorRecommendation,
@@ -116,8 +86,12 @@ def request_user_selection(ctx: Context, node_input: CoordinatorRecommendation):
     ranked = node_input.ranked_options[:MAX_USER_VISIBLE_OPTIONS]
     lines = [f"{item.rank}. {item.title} - {item.reason}" for item in ranked]
     lines.append("4. 条件を変えて再提案")
+    message_parts = []
+    if node_input.user_message:
+        message_parts.append(node_input.user_message)
+    message_parts.append("どの案で詳細旅程を作りますか。\n" + "\n".join(lines))
     yield RequestInput(
-        message="どの案で詳細旅程を作りますか。\n" + "\n".join(lines),
+        message="\n\n".join(message_parts),
         payload={"ranked_options": [item.model_dump() for item in ranked]},
         response_schema=str | int,
     )

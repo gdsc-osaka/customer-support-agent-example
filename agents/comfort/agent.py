@@ -18,7 +18,7 @@ root_agent = Agent(
         "Revision を求められた場合は RevisionReport を返し、修正不要なら revision_note に "
         "'no change' と明記してください。revised_report も option_evaluations 形式です。"
     ),
-    mode="single_turn",
+    mode="chat",
 )
 
 app = build_a2a_app(root_agent, default_port=8101)

@@ -9,7 +9,7 @@ from agents.coordinator.candidates import (
     strategist_agent,
     travel_research_workflow,
 )
-from agents.coordinator.evaluation import evaluation_agent
+from agents.coordinator.evaluation import build_evaluation_input, evaluation_agent
 from agents.coordinator.intake import (
     ROUTE_CLARIFY,
     analyst_agent,
@@ -21,9 +21,7 @@ from agents.coordinator.intake import (
 from agents.coordinator.recommendation import (
     ROUTE_REPLAN,
     ROUTE_SELECTED,
-    build_recommendation_input,
     build_replan_input,
-    coordinator_agent,
     planning_workflow,
     request_user_selection,
     route_user_selection,
@@ -39,9 +37,8 @@ candidate_workflow = Workflow(
             strategist_agent,
             store_travel_options,
             travel_research_workflow,
+            build_evaluation_input,
             evaluation_agent,
-            build_recommendation_input,
-            coordinator_agent,
             store_recommendation,
             request_user_selection,
             route_user_selection,

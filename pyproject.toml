@@ -14,8 +14,8 @@ dependencies = [
   "pydantic==2.12.5",
   "python-dotenv==1.2.1",
   "uvicorn==0.38.0",
-  "ag-ui-protocol==0.1.18",
   "fastapi==0.136.3",
+  "ag-ui-adk>=0.6.5",
 ]
 
 [project.optional-dependencies]
