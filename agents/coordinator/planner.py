@@ -22,7 +22,7 @@ from agents.coordinator.evaluation_models import (
 )
 from agents.coordinator.clarify import STATE_TRAVEL_REQUEST
 from agents.coordinator.clarify_models import TravelRequest
-from agents.coordinator.recommendation_models import (
+from agents.coordinator.planner_models import (
     CoordinatorRecommendation,
     RankedOption,
     SelectedOptionContext,
