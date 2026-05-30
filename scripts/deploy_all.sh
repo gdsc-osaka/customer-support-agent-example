@@ -35,7 +35,6 @@ UV_BIN="${UV_BIN:-uv}"
 LOG_DIR="${REPO_ROOT}/.agent-runtime-temp"
 DEPLOY_WORK_DIR="${LOG_DIR}/deploy-work"
 REQ_FILE="${LOG_DIR}/requirements.txt"
-TRACE_TO_CLOUD="${TRACE_TO_CLOUD:-${TRAVEL_AGENT_TRACE_TO_CLOUD:-false}}"
 A2A_ENV_NAMES=(
   COMFORT_A2A_URL
   RISK_A2A_URL
@@ -80,13 +79,6 @@ info()  { printf "%s[info]%s %s\n"  "${FG_BLUE}${BOLD}"   "${RESET}" "$*"; }
 ok()    { printf "%s[ ok ]%s %s\n"  "${FG_GREEN}${BOLD}"  "${RESET}" "$*"; }
 warn()  { printf "%s[warn]%s %s\n"  "${FG_YELLOW}${BOLD}" "${RESET}" "$*"; }
 err()   { printf "%s[fail]%s %s\n"  "${FG_RED}${BOLD}"    "${RESET}" "$*" >&2; }
-
-is_truthy() {
-  case "${1:-}" in
-    1|true|TRUE|yes|YES|on|ON) return 0 ;;
-    *) return 1 ;;
-  esac
-}
 
 validate_coordinator_a2a_env() {
   local missing=()
@@ -208,16 +200,13 @@ info "Exporting requirements..."
 # in spec.deployment_spec.env is rejected.
 DEPLOY_ENV_FILE="${LOG_DIR}/deploy.env"
 if [[ -f "${REPO_ROOT}/.env" ]]; then
-  grep -v -E '^[[:space:]]*(GOOGLE_API_KEY|GOOGLE_GENAI_USE_VERTEXAI|GOOGLE_CLOUD_PROJECT|GOOGLE_CLOUD_LOCATION|GOOGLE_CLOUD_REGION|TRACE_TO_CLOUD|TRAVEL_AGENT_TRACE_TO_CLOUD|[A-Z_]+_A2A_URL)[[:space:]]*=' \
+  grep -v -E '^[[:space:]]*(GOOGLE_API_KEY|GOOGLE_GENAI_USE_VERTEXAI|GOOGLE_CLOUD_PROJECT|GOOGLE_CLOUD_LOCATION|GOOGLE_CLOUD_REGION|[A-Z_]+_A2A_URL)[[:space:]]*=' \
     "${REPO_ROOT}/.env" > "${DEPLOY_ENV_FILE}" || true
 else
   : > "${DEPLOY_ENV_FILE}"
 fi
 echo "GOOGLE_GENAI_USE_VERTEXAI=true" >> "${DEPLOY_ENV_FILE}"
 echo "TRAVEL_AGENT_A2A_USE_ADC_AUTH=true" >> "${DEPLOY_ENV_FILE}"
-if is_truthy "${TRACE_TO_CLOUD}"; then
-  echo "TRAVEL_AGENT_TRACE_TO_CLOUD=true" >> "${DEPLOY_ENV_FILE}"
-fi
 
 slugify() {
   printf "%s" "$1" \
@@ -231,11 +220,7 @@ prepare_deploy_source() {
   local deploy_kind="$3"
   local description="$4"
   local description_literal
-  local trace_literal="False"
   description_literal="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "${description}")"
-  if is_truthy "${TRACE_TO_CLOUD}"; then
-    trace_literal="True"
-  fi
 
   rm -rf "${source_dir}"
   mkdir -p "${source_dir}"
@@ -292,7 +277,6 @@ vertexai.init(
 
 adk_app = AdkApp(
     app=App(name=root_agent.name or "travel_planning_agent", root_agent=root_agent),
-    enable_tracing=${trace_literal},
 )
 PY
   fi

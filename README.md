@@ -51,7 +51,6 @@ Optional environment variables:
 COMFORT_A2A_URL=http://localhost:8101
 RISK_A2A_URL=http://localhost:8102
 EXPERIENCE_A2A_URL=http://localhost:8103
-TRAVEL_AGENT_TRACE_TO_CLOUD=true
 ```
 
 ## Run

@@ -3,14 +3,12 @@ from __future__ import annotations
 import os
 import sys
 import time
-import warnings
 from pathlib import Path
 
 import httpx
 from dotenv import load_dotenv
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-_CLOUD_TRACE_ENABLED = False
 
 
 def ensure_repo_path() -> None:
@@ -26,34 +24,6 @@ load_dotenv(REPO_ROOT / ".env")
 def env_bool(name: str) -> bool:
     return os.getenv(name, "").lower() in {"1", "true", "yes", "on"}
 
-
-def maybe_enable_cloud_trace() -> None:
-    global _CLOUD_TRACE_ENABLED
-    if _CLOUD_TRACE_ENABLED or not env_bool("TRAVEL_AGENT_TRACE_TO_CLOUD"):
-        return
-
-    try:
-        import google.auth
-        from google.adk.telemetry.google_cloud import get_gcp_exporters, get_gcp_resource
-        from google.adk.telemetry.setup import maybe_set_otel_providers
-
-        credentials, project_id = google.auth.default()
-        hooks = get_gcp_exporters(
-            enable_cloud_tracing=True,
-            google_auth=(credentials, project_id),
-        )
-        maybe_set_otel_providers(
-            otel_hooks_to_setup=[hooks],
-            otel_resource=get_gcp_resource(project_id),
-        )
-    except Exception as exc:  # pragma: no cover - depends on local/cloud auth state.
-        warnings.warn(f"Cloud Trace setup skipped: {exc}", stacklevel=2)
-        return
-
-    _CLOUD_TRACE_ENABLED = True
-
-
-maybe_enable_cloud_trace()
 
 def remote_agent_card_url(env_name: str, default_base_url: str) -> str:
     base_url = os.getenv(env_name, default_base_url).rstrip("/")

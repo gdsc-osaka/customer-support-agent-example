@@ -27,7 +27,7 @@ from agents.coordinator.recommendation_models import (
     RankedOption,
     SelectedOptionContext,
 )
-from agents.coordinator.recommendation_prompts import FRONTEND_SKILL, IMAGE_PROMPT_FORMAT
+from agents.coordinator.recommendation_prompts import IMAGE_PROMPT_FORMAT
 from agents.coordinator.utils import text
 
 __all__ = [
@@ -72,10 +72,9 @@ illustrator_prompt_agent = Agent(
     instruction=(
         "入力: 旅行旅程\n"
         "出力: i枚の旅行しおり画像を生成するための英語のprompt\n"
-        f"{FRONTEND_SKILL}",
         "- 画像生成プロンプト以外を出力するのは禁止です\n"
         "- 旅程ごとに最適なしおり画像は異なります\n"
-        "- 入力された旅程情報を全てテキストとして配置してください. 省略は禁止です.\n"
+        "- 入力された旅程情報を全て配置してください. 省略は禁止です.\n"
         "- この画像を見るだけで旅程と全く同じ旅行ができることが目標です\n"
         "- 画像のスタイルはこれをそのまま貼ってください: 'flat 2D cel-shaded anime illustration, hand-drawn line art, crisp black outlines, minimal gradients, no realistic skin texture, no 3D rendering, no photorealistic lighting, no glossy highlights, no cinematic color grading'"
         f"- プロンプトは以下のフォーマット例に従ってください\n{IMAGE_PROMPT_FORMAT}"
