@@ -8,7 +8,7 @@ from google.adk.tools import google_search
 from google.adk.workflow import node
 
 from agents.coordinator.candidates_models import ResearchReport, TravelOption, TravelOptions
-from agents.coordinator.intake import STATE_TRAVEL_REQUEST
+from agents.coordinator.clarify import STATE_TRAVEL_REQUEST
 from agents.coordinator.utils import dump, text
 
 __all__ = [
@@ -24,19 +24,6 @@ STRATEGIST_AGENT_MODEL = "gemini-3.5-flash"
 RESEARCH_AGENT_MODEL = "gemini-3.1-flash-lite"
 RESEARCH_REPORT_FORMATTER_MODEL = "gemini-3.1-flash-lite"
 
-
-# --- Workflows ---------------------------------------------------------
-
-@node(name="travel_research_workflow", rerun_on_resume=True)
-async def travel_research_workflow(ctx: Context, node_input: Any) -> dict[str, dict[str, Any]]:
-    options = ctx.state.get(STATE_TRAVEL_OPTIONS)
-    if not options and isinstance(node_input, TravelOptions):
-        options = [option.model_dump() for option in node_input.options]
-        ctx.state[STATE_TRAVEL_OPTIONS] = options
-
-    tasks = [ctx.run_node(research_candidate, option) for option in options or []]
-    reports = await asyncio.gather(*tasks)
-    return collect_research_reports(ctx, reports)
 
 # --- Agents -----------------------------------------------------------------
 
@@ -86,6 +73,18 @@ research_report_formatter = Agent(
 
 
 # --- Workflow nodes ---------------------------------------------------------
+
+@node(name="travel_research_workflow", rerun_on_resume=True)
+async def travel_research_workflow(ctx: Context, node_input: Any) -> dict[str, dict[str, Any]]:
+    options = ctx.state.get(STATE_TRAVEL_OPTIONS)
+    if not options and isinstance(node_input, TravelOptions):
+        options = [option.model_dump() for option in node_input.options]
+        ctx.state[STATE_TRAVEL_OPTIONS] = options
+
+    tasks = [ctx.run_node(research_candidate, option) for option in options or []]
+    reports = await asyncio.gather(*tasks)
+    return collect_research_reports(ctx, reports)
+
 
 def store_travel_options(ctx: Context, node_input: TravelOptions) -> TravelOptions:
     ctx.state[STATE_TRAVEL_OPTIONS] = [option.model_dump() for option in node_input.options]
